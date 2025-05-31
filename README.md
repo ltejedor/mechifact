@@ -42,7 +42,7 @@ Debug complex multi-agent workflows with comprehensive logs, error tracking, and
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/mechifact.git
+   git clone https://github.com/ltejedor/mechifact.git
    cd mechifact
    ```
 
