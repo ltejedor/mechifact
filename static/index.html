@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Live Agent View</title>
+  <!-- Use dist build to avoid SES lockdown issues -->
+  <script src="https://unpkg.com/vis-network/dist/vis-network.min.js"></script>
+  <link href="https://unpkg.com/vis-timeline/dist/vis-timeline-graph2d.min.css" rel="stylesheet" />
+  <script src="https://unpkg.com/vis-timeline/dist/vis-timeline-graph2d.min.js"></script>
+  <style>
+    body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; font-family: Arial, sans-serif; }
+    #network { flex: 1; border-bottom: 1px solid #ddd; }
+    #timeline { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <div id="timeline"></div>
+  <script>
+    // Initialize vis-timeline
+    const groups = new vis.DataSet();
+    const items = new vis.DataSet();
+    let timeline;
+    try {
+      timeline = new vis.Timeline(
+        document.getElementById('timeline'),
+        items,
+        groups,
+        { selectable: true, showCurrentTime: false }
+      );
+    } catch (err) {
+      console.error('Timeline init error:', err);
+    }
+
+    // Connect to the SSE endpoint
+    const source = new EventSource('/events');
+    // Log SSE connection status
+    source.onopen = () => console.log('SSE connection opened');
+    source.onerror = (err) => console.error('SSE error:', err);
+    source.onmessage = function(event) {
+      try {
+        const rec = JSON.parse(event.data);
+        handleRec(rec);
+      } catch (err) {
+        console.error('Failed to parse event', err);
+      }
+    };
+
+    function handleRec(rec) {
+      // Manage basic task/session events
+      if (rec.type === 'task_start') {
+        console.log('Task start:', rec.task);
+        return;
+      }
+      if (rec.type === 'session_end') {
+        console.log('Session ended');
+        return;
+      }
+
+      // Ensure agent node and timeline group exist
+      const agent = rec.agent;
+      const agentId = 'agent:' + agent;
+
+      if (!groups.get(agent)) {
+        groups.add({ id: agent, content: agent });
+      }
+
+      // If action, add timeline item and tool/observation details
+      if (rec.type === 'action') {
+        const stepId = agentId + ':step:' + rec.sequence;
+        
+        if (rec.start_time) {
+          items.add({
+            id: stepId,
+            group: agent,
+            content: rec.type,
+            start: new Date(rec.start_time * 1000),
+            end: new Date(rec.end_time * 1000)
+          });
+        }
+        (rec.tool_calls || []).forEach((call, i) => {
+          const toolName = call.function.name;
+          const toolId = 'tool:' + toolName;
+
+          const callId = stepId + ':call:' + i;
+          items.add({ id: callId, group: agent, content: '🔧 ' + toolName, start: new Date(rec.start_time * 1000), type: 'point' });
+          if (rec.observations) {
+            const obsId = stepId + ':obs';
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
+
